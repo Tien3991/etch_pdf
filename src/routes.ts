@@ -95,6 +95,8 @@ export interface HandoffContext {
 	route: RouteId;
 	/** Persist the armed witness record; resolves once the write completes. */
 	arm: (record: WitnessRecord) => Promise<void>;
+	/** How the URL leaves the webview. Defaults to `navigateInWebview`. */
+	navigate?: Navigate;
 }
 
 /** Percent-encode every path segment, keeping the separators. */
@@ -117,6 +119,21 @@ export interface HandoffTarget {
 	/** Logged verbatim before navigating, so the log names what fired. */
 	description: string;
 }
+
+/**
+ * How a built target leaves the webview. It is a parameter so tests and desk
+ * checks can watch a handoff without one happening; nothing in the plugin
+ * passes anything but the default.
+ */
+export type Navigate = (target: HandoffTarget) => void;
+
+export const navigateInWebview: Navigate = (target) => {
+	if (target.kind === 'open') {
+		window.open(target.url);
+	} else {
+		window.location.href = target.url;
+	}
+};
 
 /**
  * The two URLs are the product, so they are built by a pure function the
@@ -151,7 +168,7 @@ export async function performHandoff(
 	context: HandoffContext,
 	file: TFile,
 ): Promise<void> {
-	const { app, log } = context;
+	const { log } = context;
 
 	const decision = chooseRoute(context.route, file.stat.size);
 	const plan = await buildPlan(context, file, decision.route);
@@ -164,11 +181,26 @@ export async function performHandoff(
 		);
 	}
 
-	// Arm and persist the witness before the navigation fires; the webview
-	// may not survive the trip. Verification is a debug aid, so failing to
-	// arm it costs the check and not the handoff: the path is already
-	// resolved and validated here, and hashing a very large file is the
-	// likeliest way to fail. The user is told the check is unavailable.
+	await armWitness(context, file);
+	await log.line(`route ${decision.route}: ${plan.description}`);
+
+	plan.navigate();
+}
+
+/**
+ * Arm and persist the witness before the handoff fires; the webview may not
+ * survive the trip. Verification is a debug aid, so failing to arm it costs
+ * the check and not the handoff: hashing a very large file is the likeliest
+ * way to fail. The user is told the check is unavailable.
+ *
+ * Shared by every destination, so a handoff through the share sheet or a
+ * shortcut can be verified the same way as one through a route.
+ */
+export async function armWitness(
+	context: Pick<HandoffContext, 'app' | 'log' | 'arm'>,
+	file: TFile,
+): Promise<void> {
+	const { app, log } = context;
 	try {
 		const record = await armWitnessRecord(app, file.path);
 		await context.arm(record);
@@ -179,9 +211,6 @@ export async function performHandoff(
 		new Notice('Handing off without verification.');
 		await log.error(`witness arm failed for ${file.path}`, error);
 	}
-	await log.line(`route ${decision.route}: ${plan.description}`);
-
-	plan.navigate();
 }
 
 /**
@@ -206,14 +235,11 @@ async function buildPlan(
 	await log.line(`resolved ${file.path} -> ${resolved.absolutePath}`);
 
 	const target = buildHandoffTarget(route, encodePathSegments(resolved.absolutePath));
+	const navigate = context.navigate ?? navigateInWebview;
 	return {
 		description: target.description,
 		navigate: () => {
-			if (target.kind === 'open') {
-				window.open(target.url);
-			} else {
-				window.location.href = target.url;
-			}
+			navigate(target);
 		},
 	};
 }

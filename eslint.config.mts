@@ -37,10 +37,16 @@ export default defineConfig(
 		rules: {
 			// UI copy names Apple products (Apple Pencil, Apple Preview) and
 			// the Verify last handoff command, so these words are capitalized
-			// mid-sentence on purpose.
+			// mid-sentence on purpose, as is Xodo, an app's name used as an
+			// example. The steps for making a shortcut quote
+			// action names from the Shortcuts app, which keep the capitals
+			// that app gives them, so those steps are matched as a whole.
 			'obsidianmd/ui/sentence-case': [
 				'warn',
-				{ ignoreWords: ['Apple', 'Pencil', 'Preview', 'Verify'] },
+				{
+					ignoreWords: ['Apple', 'Pencil', 'Preview', 'Verify', 'Xodo'],
+					ignoreRegex: ['^Add the action "'],
+				},
 			],
 		},
 	},

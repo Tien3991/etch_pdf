@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// The obsidian package ships type definitions only. routes.ts imports Notice
-// as a runtime value, and settings.ts, pulled in here to pin the default route
-// against the dropdown order, extends PluginSettingTab at module scope.
+// The obsidian package ships type definitions only, and routes.ts imports
+// Notice as a runtime value.
 vi.mock('obsidian', () => ({
 	Notice: class {},
-	PluginSettingTab: class {},
 }));
 
 import {
@@ -18,7 +16,7 @@ import {
 	isRouteId,
 } from './routes';
 import { parseResourcePath } from './resolve';
-import { DEFAULT_SETTINGS } from './settings';
+import { DEFAULT_SETTINGS } from './config';
 
 describe('encodePathSegments', () => {
 	it('encodes spaces and keeps separators', () => {
@@ -129,8 +127,8 @@ describe('ROUTE_LABELS', () => {
 
 	it('names the same route the settings default selects', () => {
 		const [first] = Object.keys(ROUTE_LABELS);
-		expect(first).toBe(DEFAULT_SETTINGS.route);
-		expect(DEFAULT_SETTINGS.route).toBe('shareddocuments');
+		expect(first).toBe(DEFAULT_SETTINGS.target);
+		expect(DEFAULT_SETTINGS.target).toBe('shareddocuments');
 	});
 });
 

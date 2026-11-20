@@ -4,9 +4,76 @@
 }
 
 /*
-The pencil button Etch adds to a file view carries .etch-view-action and no
-rule of its own on purpose. It is one of Obsidian's header buttons and
-inherits that size, and a size set here without a measurement on the device
-would fight the active theme. The class ships so the measurement has
-something to attach to.
+The split button Etch adds to a file view. The left half hands the file to
+the default app and names it; the right half opens the list of apps. Both
+halves are Obsidian header buttons, and this wrapper is what makes them one
+control: the header puts a gap between its own buttons, and a shared border
+with a single divider is the only thing that reads as "two halves".
+
+These sizes were set against Obsidian 1.15.1 on macOS, in its mobile
+emulation. They have not been measured on an iPad, where the theme decides
+the header's height; nothing here sets a height for that reason.
 */
+.etch-split {
+	display: inline-flex;
+	flex: none;
+	align-items: stretch;
+	border: var(--border-width) solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	overflow: hidden;
+}
+
+.etch-split .etch-view-action {
+	width: auto;
+	height: auto;
+	margin: 0;
+	border-radius: 0;
+}
+
+.etch-split .etch-split-main {
+	gap: var(--size-2-2);
+	padding-inline: var(--size-4-2);
+}
+
+.etch-split .etch-split-menu {
+	padding-inline: var(--size-2-2);
+	border-inline-start: var(--border-width) solid
+		var(--background-modifier-border);
+}
+
+/* A finger needs more room than a pointer to hit the narrow half. */
+.is-mobile .etch-split .etch-split-menu {
+	padding-inline: var(--size-4-3);
+}
+
+.etch-split-label {
+	max-width: 12ch;
+	overflow: hidden;
+	font-size: var(--font-ui-small);
+	line-height: var(--line-height-tight);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* A shortcut's name is a short sentence; the default field width cuts it off. */
+.etch-app-editor .setting-item-control input[type='text'] {
+	width: 16em;
+	max-width: 100%;
+}
+
+/* The steps for making a shortcut, in the app editor. */
+.etch-app-steps {
+	margin-block: var(--size-4-3);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.etch-app-steps ol {
+	margin-block: var(--size-4-2);
+	padding-inline-start: var(--size-4-6);
+}
+
+/* An app with no shortcut cannot be opened; its row says so in the warning color. */
+.etch-app-incomplete .setting-item-description {
+	color: var(--text-warning);
+}

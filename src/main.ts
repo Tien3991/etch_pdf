@@ -1,10 +1,21 @@
-import { Notice, Platform, Plugin, TFile, normalizePath } from 'obsidian';
+import { Menu, Notice, Platform, Plugin, TFile, normalizePath } from 'obsidian';
 import { ViewActions } from './actions';
+import { EtchSettings, parseSettings } from './config';
 import { isMarkupFile } from './formats';
-import { EtchLog, describeError } from './log';
+import { handOffTo } from './handoff';
+import { EtchLog } from './log';
+import { TargetPicker } from './picker';
 import { ImageRefresh } from './refresh';
-import { isRouteId, performHandoff } from './routes';
-import { DEFAULT_SETTINGS, EtchSettings, EtchSettingTab } from './settings';
+import type { Navigate } from './routes';
+import { EtchSettingTab } from './settings';
+import {
+	Target,
+	listTargets,
+	resolveTarget,
+	targetIcon,
+	targetShortLabel,
+	targetTitle,
+} from './targets';
 import {
 	WitnessRecord,
 	WitnessReport,
@@ -19,6 +30,9 @@ interface EtchData {
 
 const MARK_UP_NAME = 'Mark up with Pencil';
 const MARK_UP_ICON = 'pencil';
+const CHOOSE_APP_NAME = 'Mark up with Pencil in another app';
+const CHOOSE_APP_ICON = 'list';
+const APP_MENU_NAME = 'Choose app';
 const RECHECK_DELAY_MS = 3000;
 
 function isIpad(): boolean {
@@ -33,6 +47,14 @@ export default class EtchPlugin extends Plugin {
 	private rejectedRoute: string | null = null;
 	private rejectedWitness = false;
 	private unloaded = false;
+	/**
+	 * How a handoff leaves the webview. Both stay undefined in use, which
+	 * selects the real navigation and Obsidian's own share sheet; they are
+	 * fields so a desk check can watch a handoff without one happening.
+	 */
+	private navigate: Navigate | undefined = undefined;
+	private share: ((vaultPath: string) => Promise<boolean>) | undefined =
+		undefined;
 	/** Serializes plugin-data writes; saveData replaces the whole file. */
 	private saveQueue: Promise<void> = Promise.resolve();
 
@@ -73,6 +95,19 @@ export default class EtchPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: 'mark-up-choose-app',
+			name: CHOOSE_APP_NAME,
+			icon: CHOOSE_APP_ICON,
+			checkCallback: (checking) => {
+				if (!isIpad()) return false;
+				const file = this.activeMarkupFile();
+				if (!file) return false;
+				if (!checking) this.chooseApp(file);
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: 'verify-last-handoff',
 			name: 'Verify last handoff',
 			checkCallback: (checking) => {
@@ -96,17 +131,30 @@ export default class EtchPlugin extends Plugin {
 							void this.markUp(file);
 						}),
 				);
+				menu.addItem((item) =>
+					item
+						.setTitle(CHOOSE_APP_NAME)
+						.setIcon(CHOOSE_APP_ICON)
+						.setSection('open')
+						.onClick(() => {
+							this.chooseApp(file);
+						}),
+				);
 			}),
 		);
 
-		this.viewActions = new ViewActions(
-			this.app,
-			MARK_UP_ICON,
-			MARK_UP_NAME,
-			(file) => {
+		this.viewActions = new ViewActions(this.app, {
+			icon: MARK_UP_ICON,
+			title: MARK_UP_NAME,
+			menuTitle: APP_MENU_NAME,
+			label: () => targetShortLabel(this.defaultTarget()),
+			onMain: (file) => {
 				void this.markUp(file);
 			},
-		);
+			onMenu: (file, _view, anchor) => {
+				this.showAppMenu(file, anchor);
+			},
+		});
 		this.register(() => {
 			this.viewActions.dispose();
 		});
@@ -133,7 +181,7 @@ export default class EtchPlugin extends Plugin {
 			this.whenReady(() => {
 				if (rejectedRoute !== null) {
 					void this.log.line(
-						`stored route ${rejectedRoute} is not a known route; using ${this.settings.route}`,
+						`stored default app ${rejectedRoute} is not known; using ${this.settings.target}`,
 					);
 				}
 				if (rejectedWitness) {
@@ -205,28 +253,76 @@ export default class EtchPlugin extends Plugin {
 	 * arriving here would otherwise be an unhandled rejection with nothing on
 	 * screen and nothing in the log.
 	 */
-	private async markUp(file: TFile): Promise<void> {
+	private async markUp(file: TFile, chosen?: Target): Promise<void> {
 		if (!isMarkupFile(file)) {
 			await this.log.error(`${file.path} is not a format Etch hands off`);
 			return;
 		}
+		// No choice means the default app: the left half of the button, the
+		// command, and the file menu's first entry.
+		const target = chosen ?? this.defaultTarget();
 		try {
-			await performHandoff(
+			await handOffTo(
 				{
 					app: this.app,
 					log: this.log,
-					route: this.settings.route,
 					arm: async (record) => {
 						this.witnessRecord = record;
 						await this.savePluginData();
 					},
+					navigate: this.navigate,
+					share: this.share,
 				},
 				file,
+				target,
 			);
 		} catch (error) {
 			new Notice('Etch could not complete the handoff.');
 			await this.log.error(`handoff failed for ${file.path}`, error);
 		}
+	}
+
+	/**
+	 * The destination the setting names, or the Files viewer when it names
+	 * none. Resolved on every use: the app it points at can be deleted, on
+	 * this device or on another one that syncs the same data.json.
+	 */
+	private defaultTarget(): Target {
+		return resolveTarget(this.settings.target, this.settings.apps).target;
+	}
+
+	/**
+	 * The right half of the button: every destination, the default one
+	 * ticked. Choosing one hands off to it once and leaves the setting alone.
+	 */
+	private showAppMenu(file: TFile, anchor: HTMLElement): void {
+		const fallback = this.defaultTarget();
+		const menu = new Menu();
+		for (const target of listTargets(this.settings.apps)) {
+			menu.addItem((item) =>
+				item
+					.setTitle(targetTitle(target))
+					.setIcon(targetIcon(target))
+					.setChecked(target.id === fallback.id)
+					.onClick(() => {
+						void this.markUp(file, target);
+					}),
+			);
+		}
+		// Hung under the button and opening leftward from its right edge, so
+		// the menu covers neither half and stays inside the view.
+		const rect = anchor.getBoundingClientRect();
+		menu.showAtPosition(
+			{ x: rect.right, y: rect.bottom, left: true },
+			anchor.doc,
+		);
+	}
+
+	/** The same list for the tap points with no button: a picker. */
+	private chooseApp(file: TFile): void {
+		new TargetPicker(this.app, listTargets(this.settings.apps), (target) => {
+			void this.markUp(file, target);
+		}).open();
 	}
 
 	/**
@@ -342,6 +438,8 @@ export default class EtchPlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
+		// The button names the default app, so it follows the setting.
+		this.viewActions.refresh();
 		await this.savePluginData();
 	}
 
@@ -354,18 +452,9 @@ export default class EtchPlugin extends Plugin {
 	 */
 	private async loadPluginData(): Promise<void> {
 		const raw = (await this.loadData()) as Partial<EtchData> | null;
-		const stored: unknown = raw?.settings;
-		const storedSettings = (stored ?? {}) as Record<string, unknown>;
-
-		const storedRoute = storedSettings.route;
-		const knownRoute = isRouteId(storedRoute);
-		if (storedRoute !== undefined && !knownRoute) {
-			this.rejectedRoute = describeError(storedRoute);
-		}
-		this.settings = {
-			route: knownRoute ? storedRoute : DEFAULT_SETTINGS.route,
-			debugLogging: storedSettings.debugLogging === true,
-		};
+		const parsed = parseSettings(raw?.settings);
+		this.settings = parsed.settings;
+		this.rejectedRoute = parsed.rejectedTarget;
 
 		this.witnessRecord = isWitnessRecord(raw?.witness) ? raw.witness : null;
 		if (raw?.witness != null && !this.witnessRecord) {
