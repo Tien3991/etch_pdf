@@ -7,6 +7,25 @@ heading at release; the same lines become the GitHub release notes.
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-20
+
+First release of the Etch PDF fork. Handoffs are unchanged from Etch 0.2.0
+unless the experiment below is switched on.
+
+### Added
+
+- Page forwarding experiment: with debug logging on, a new "Page in link"
+  setting appends the page shown in the PDF view to the handoff link, as
+  `#page=N` or `?page=N`. It is off by default and unproven: no viewer is
+  known to honour it yet.
+- "Show detected page" command, available while debug logging is on: reports
+  the page the plugin reads from the open PDF, and how it read it.
+
+### Changed
+
+- The plugin id is now `etch-pdf` and its name Etch PDF, so it installs
+  beside the original Etch instead of replacing it.
+
 ## 0.2.0 - 2026-08-11
 
 ### Added

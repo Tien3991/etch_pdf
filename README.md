@@ -1,6 +1,15 @@
-# Etch
+# Etch PDF
 
 Native Apple Pencil markup for Obsidian PDFs and images.
+
+Etch PDF is a fork of [Etch](https://github.com/nickarrow/etch) by Nick
+Aretakis. It hands off files exactly as Etch 0.2.0 does, and adds one
+experiment: forwarding the page shown in Obsidian to the viewer. The
+experiment is off unless you turn it on, and it is unproven; see
+[Page forwarding](#page-forwarding-experiment). Everything else below is
+upstream's description of Etch 0.2.0, unchanged. The plugin has its own id,
+`etch-pdf`, so it installs beside Etch; keep only one of the two enabled, or
+every PDF gets two pencils.
 
 One tap opens a vault PDF or image for Apple Pencil markup. Draw with the
 Pencil, tap the check mark, and the ink is in the same vault file: visible
@@ -106,7 +115,46 @@ markup landed.
   and reports whether its content changed. When off, errors go to the
   console only. Verification reads the whole file to hash it, so on a very
   large file it can be unavailable; the handoff still happens, and a notice
-  says the check was skipped.
+  says the check was skipped. Debug logging also enables the "Show detected
+  page" command and the setting below.
+- Page in link (experiment). Shown only while debug logging is on, and applied
+  only while it is on. "Off (default)" builds the same link Etch always has.
+  "#page=N" and "?page=N" append the page shown in the PDF view to the link.
+  See the next section before using it.
+
+## Page forwarding (experiment)
+
+The goal is for the viewer to open on the page you were reading in Obsidian
+instead of on page 1. Whether any viewer can be told a page is the open
+question, so this ships as an experiment and not as a feature.
+
+What is established:
+
+- Reading the page works. The plugin reads it from the PDF view at the moment
+  of the tap: the toolbar's page box, the page label when the PDF has labels
+  such as "iv", and failing both, whichever page fills most of the view. This
+  was checked in Obsidian 1.15.1 on macOS against plain, labelled, and
+  repeated-label PDFs, zoomed in and out and with one file open in two tabs.
+  The "Show detected page" command reports what it reads.
+- A start page stored inside the PDF does not work with Apple's PDF engine.
+  macOS 26.5.1 PDFKit opened a test document on page 1 with its OpenAction
+  pointing at page 5, in three forms. Etch does not write to your files in any
+  case, so this path is closed twice over.
+
+What is not established:
+
+- Whether the Files viewer or Preview honours a page appended to the link.
+  Neither documents one, and no device session has shown it. A link carrying a
+  suffix might open on the page, open on page 1 as before, or fail to open the
+  file; if a handoff stops working, set the experiment back to off.
+
+`docs/device-tests.md` holds the test matrix and the results as they come in.
+Nothing in this section is a promise until a row there says so.
+
+One disclosure: the page is read from the page elements of Obsidian's PDF
+viewer, reached through the view's public container. That is not an internal
+API call, but the shape of those elements is not a documented contract
+either. If it changes, the plugin reads no page and hands off without one.
 
 ## Data safety
 
@@ -123,14 +171,16 @@ verifiable in the source.
 
 ## Install
 
-Etch is not yet in the community plugin directory. Until it is listed:
+Etch PDF is not in the community plugin directory.
 
-- BRAT: install the BRAT community plugin and add `nickarrow/etch` as a
+- BRAT: install the BRAT community plugin and add `Tien3991/etch_pdf` as a
   beta plugin. BRAT installs the highest version published, release or
   pre-release.
 - Manual: copy `main.js`, `manifest.json`, and `styles.css` from a release
-  into `<vault>/.obsidian/plugins/etch/`, then enable Etch under community
-  plugins.
+  into `<vault>/.obsidian/plugins/etch-pdf/`, then enable Etch PDF under
+  community plugins.
+
+If the original Etch is installed, disable it while Etch PDF is enabled.
 
 ## License
 
