@@ -7,6 +7,26 @@ heading at release; the same lines become the GitHub release notes.
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-20
+
+### Added
+
+- A choice of apps. The button on a PDF or image is now split in two: the
+  left half opens the file in the default app, and the right half lists
+  every app for a one-off choice.
+- Apps opened by a shortcut. Add an editor such as Xodo or PDF Viewer in
+  settings, with the name of a shortcut that opens a file in it, and it
+  joins the list.
+- "Other app (share sheet)" in the list: shows the share sheet, where you
+  pick the app.
+- "Mark up with Pencil in another app" in the command palette and the file
+  menu, for the same list without the button.
+
+### Changed
+
+- The "Handoff route" setting is now "Default app". A choice made before the
+  update is kept.
+
 ## 0.3.1 - 2026-11-20
 
 ### Removed

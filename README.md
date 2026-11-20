@@ -3,15 +3,21 @@
 Native Apple Pencil markup for Obsidian PDFs and images.
 
 Etch PDF is a fork of [Etch](https://github.com/nickarrow/etch) by Nick
-Aretakis, made to test one idea: forwarding the page shown in Obsidian to the
-viewer, so that markup opens where you were reading. The test failed, and as
-of 0.3.1 the experiment is removed: this plugin now behaves exactly like Etch
-0.2.0. Unless you are picking that work up again, install the original Etch.
-What was tried and what was learned is in
-[Page forwarding](#page-forwarding-tried-and-closed). Everything else below is
-upstream's description of Etch 0.2.0, unchanged. The plugin has its own id,
-`etch-pdf`, so it installs beside Etch; keep only one of the two enabled, or
-every PDF gets two pencils.
+Aretakis. It hands a file to the Files viewer or to Preview exactly as Etch
+0.2.0 does, and adds a choice of apps. The button on a PDF or image is split
+in two: the left half opens the file in the app you set as default, and the
+right half lists every app. Beside the two viewers, that list can hold
+editors such as Xodo or PDF Viewer, each opened through a shortcut you make
+once, and an entry for the share sheet. See [Apps](#apps).
+
+None of the added apps has been through a device session yet;
+`docs/device-tests.md` holds the matrix, and until its rows are filled in the
+added apps are unproven. An earlier experiment, forwarding the page shown in
+Obsidian, was tried and closed; see
+[Page forwarding](#page-forwarding-tried-and-closed). Where the text below
+describes the Files viewer and Preview, it is upstream's description of Etch
+0.2.0, unchanged. The plugin has its own id, `etch-pdf`, so it installs
+beside Etch; keep only one of the two enabled, or every PDF gets two buttons.
 
 One tap opens a vault PDF or image for Apple Pencil markup. Draw with the
 Pencil, tap the check mark, and the ink is in the same vault file: visible
@@ -68,9 +74,11 @@ not depend on it.
 Etch is only the bridge. A tap resolves the file's absolute on-disk path
 from Obsidian's public API, validates it, percent-encodes it into a URL, and
 navigates exactly once; iPadOS then opens the document in the Files viewer
-(`shareddocuments://`, the default route) or in Preview (`file://`). Etch makes
-no internal Obsidian API calls: both routes are ordinary web navigation, and
-the path is parsed from what a public API returns. One disclosure applies:
+(`shareddocuments://`, the default route) or in Preview (`file://`). On these
+two routes Etch makes no internal Obsidian API calls: both are ordinary web
+navigation, and the path is parsed from what a public API returns. The share
+sheet entry is the one exception, described under [Apps](#apps). One
+disclosure applies:
 how iPadOS handles these URLs from an app webview is undocumented behavior
 with no API contract. If the OS or Obsidian ever changes any of this, Etch
 shows an error notice and stays put; it never navigates on a path it could
@@ -81,11 +89,17 @@ evidence; see `docs/spike/FINDINGS.md`.
 
 Three ways to start, all equivalent:
 
-- tap the pencil icon on an open PDF or image,
+- tap the left half of the button on an open PDF or image, the half with the
+  pencil and the app's name,
 - choose "Mark up with Pencil" from the file's long-press menu,
 - run the "Mark up with Pencil" command from the command palette.
 
-The file opens in the Files viewer. Tap Markup, draw with the Pencil, then tap
+Each opens the file in the default app. To use another app once, tap the
+right half of the button and pick from the list, or choose "Mark up with
+Pencil in another app" from the file menu or the command palette. Picking
+from the list does not change the default.
+
+With the Files viewer as the default, the file opens in the Files viewer. Tap Markup, draw with the Pencil, then tap
 the check mark, which is what saves. Switch back to Obsidian and the ink is in
 the file. That viewer also offers "Open in Preview", which is worth avoiding
 for the reason in Limitations.
@@ -107,17 +121,79 @@ markup landed.
 
 ## Settings
 
-- Handoff route. "Files viewer (default)" opens the file in the Files viewer,
-  where Markup is one tap and the check mark saves. "Preview" opens it
-  directly in Preview, which is smoother on small files since it saves without
-  a tap, and any file of 4 MB or more still goes to the Files viewer. If one
-  route ever stops working after an OS update, the other is the fallback.
+- Default app. What the left half of the button opens. "Files viewer
+  (default)" opens the file in the Files viewer, where Markup is one tap and
+  the check mark saves. "Preview" opens it directly in Preview, which is
+  smoother on small files since it saves without a tap, and any file of 4 MB
+  or more still goes to the Files viewer. The list also holds every app
+  added below, and "Other app (share sheet)". If one way ever stops working
+  after an OS update, the others are the fallback.
+- Apps opened by a shortcut. The editors you add, each with its name and the
+  name of the shortcut that opens a file in it. "Add app" offers Xodo and PDF
+  Viewer as starting points, or an empty entry. "Edit" on a row changes or
+  removes it. See [Apps](#apps) for making the shortcut.
 - Debug logging. Writes a verbose log to the plugin folder and enables the
   "Verify last handoff" command, which re-hashes the last handed-off file
   and reports whether its content changed. When off, errors go to the
   console only. Verification reads the whole file to hash it, so on a very
   large file it can be unavailable; the handoff still happens, and a notice
   says the check was skipped.
+
+## Apps
+
+The right half of the button, and the default-app setting, list four kinds
+of destination.
+
+| Destination | How the file gets there | Evidence so far |
+| --- | --- | --- |
+| Files viewer | A `shareddocuments://` link, as in Etch | Upstream's device sessions on iPadOS 26.5.2 |
+| Preview | A `file://` link, as in Etch | Upstream's device sessions on iPadOS 26.5.2 |
+| An app you add, such as Xodo | Runs your shortcut, which opens the file in that app | None yet |
+| Other app (share sheet) | Shows the share sheet; you pick the app | Upstream's spike saw Preview write in place through it; no other app yet |
+
+Why an editor needs a shortcut or the share sheet: iPadOS gives a plugin no
+way to say "open this file in that app" unless the app offers a link for it,
+and none of the editors checked does. PDF Expert documents a link for files
+in its own storage only; Xodo and PDF Viewer document none. PDF-XChange has
+no iPad app at all, according to its own support forum in August 2025, so it
+cannot be on the list.
+
+### Making a shortcut
+
+Once per app, in the Shortcuts app on the iPad:
+
+1. Create a shortcut. Its name is what you enter as the shortcut name in
+   Etch, for example "Open in Xodo"; the two have to match exactly.
+2. Add the action "Get File from Folder". Set its folder to the vault (On My
+   iPad, Obsidian, then the vault), and its file path to Shortcut Input.
+3. Add the action "Open File", and set its app to the editor.
+
+Etch runs the shortcut by the documented `shortcuts://run-shortcut` link and
+passes it the file's path inside the vault. The Shortcuts app comes to the
+front for a moment on the way. The action names above are the English ones
+as best known; they have not been confirmed in a device session with this
+build, so the labels on your iPad may differ slightly.
+
+### What to check with an editor
+
+Whether ink lands in the vault file is up to the editor. An editor that
+opens the file in place writes into the vault file, like the Files viewer
+does. An editor that imports a copy leaves the vault file untouched, and the
+ink stays inside that app. Turn on debug logging, hand a file off, write on
+it, come back, and run "Verify last handoff": "content changed" means the
+vault file was written. Do this once per editor before trusting it with
+anything.
+
+### The share sheet and Obsidian's internals
+
+"Other app (share sheet)" calls `app.openWithDefaultApp`, the function behind
+Obsidian's own Share item. It is not part of the public API, and it is the
+only internal call Etch PDF makes; it lives alone in `src/native.ts`. If a
+future Obsidian removes it, that entry shows a notice and does nothing, and
+every other destination keeps working. Upstream measured this function in
+its spike (`docs/spike/FINDINGS.md`, experiments e4 and e1d) and chose not to
+ship it; this fork ships it because it is the one way to reach an editor
+with no setup.
 
 ## Page forwarding: tried and closed
 
@@ -161,11 +237,14 @@ your files: verification hashes bytes, and its settings and debug log live
 in the plugin's own folder. Etch makes no network requests, which is
 verifiable in the source.
 
+The paragraph above is about the Files viewer and Preview. An editor reached
+through a shortcut or the share sheet decides for itself whether it writes
+the vault file or keeps a copy of its own; see
+[What to check with an editor](#what-to-check-with-an-editor).
+
 ## Install
 
-Etch PDF is not in the community plugin directory, and since 0.3.1 it does
-nothing the original Etch does not. To install the original, add
-`nickarrow/etch` in BRAT instead. To install this fork anyway:
+Etch PDF is not in the community plugin directory.
 
 - BRAT: install the BRAT community plugin and add `Tien3991/etch_pdf` as a
   beta plugin. BRAT installs the highest version published, release or
