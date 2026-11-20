@@ -3,32 +3,47 @@
 The question this file answers: can the viewer Etch hands a PDF to be made to
 open on the page that was showing in Obsidian?
 
+## Outcome
+
+No, not by anything the plugin can put in the link or leave in the file.
+
+- 2026-11-20, iPadOS 18.7.8: with the page appended to the handoff link, the
+  Files viewer still opened on page 1.
+- 2026-11-20, macOS 26.5.1: PDFKit ignored a start page stored in the PDF.
+
+The experiment shipped in 0.3.0 and was removed in 0.3.1. Its code is in the
+`0.3.0` tag (`src/page.ts`, and the suffix handling in `src/routes.ts`),
+which is where to start if a later iPadOS is worth a retest: this result is
+for the Files viewer on iPadOS 18.7.8 and says nothing about the Preview app
+that iPadOS 26 adds.
+
 A row counts as evidence only when someone did the step on a device and
 wrote down what they saw. Desk checks on a Mac are listed separately, because
 they show what the plugin does and not what iPadOS does with it.
 
 ## Device matrix
 
-Setup: install Etch PDF, disable the original Etch, and turn on Debug logging
-in the plugin's settings. Open a PDF of ten pages or more and scroll to a
+This is the matrix as it was run against the 0.3.0 build. Setup: install Etch
+PDF 0.3.0, disable the original Etch, and turn on Debug logging in the
+plugin's settings. Open a PDF of ten pages or more and scroll to a
 page N well away from page 1.
 
 | # | Do | Expect to learn | Result |
 | --- | --- | --- | --- |
-| D0 | Command palette: "Show detected page" | The notice names page N. Repeat on a PDF whose first pages are numbered i, ii, iii. | not run |
-| D1 | Page in link: Off. Tap the pencil. | The PDF opens in the Files viewer as before (regression check). | not run |
-| D2 | Page in link: `#page=N`. Tap the pencil. | Does the PDF still open? On which page? | not run |
-| D3 | Page in link: `?page=N`. Tap the pencil. | Does the PDF still open? On which page? | not run |
-| D4 | Handoff route: Preview, a PDF under 4 MB. Repeat D2 and D3. | Same two answers for the `file://` link. | not run |
+| D0 | Command palette: "Show detected page" | The notice names page N. Repeat on a PDF whose first pages are numbered i, ii, iii. | not reported |
+| D1 | Page in link: Off. Tap the pencil. | The PDF opens in the Files viewer as before (regression check). | not reported |
+| D2 | Page in link: `#page=N`. Tap the pencil. | Does the PDF still open? On which page? | opened, on page 1 (see below) |
+| D3 | Page in link: `?page=N`. Tap the pencil. | Does the PDF still open? On which page? | opened, on page 1 (see below) |
+| D4 | Handoff route: Preview, a PDF under 4 MB. Repeat D2 and D3. | Same two answers for the `file://` link. | not reported |
 
-Record for each row: the date, iPadOS and Obsidian versions, what opened, and
-the page it opened on. With Debug logging on, `etch-debug.md` in the plugin
-folder holds the exact link each tap fired.
+What stands behind the D2 and D3 entries: on 2026-11-20 the tester, on
+iPadOS 18.7.8, was asked which page the Files viewer opened on with the page
+in the link, after instructions to try both forms, and answered "Still page
+1". The answer was not broken down by row, so D2 and D3 share it; the
+Obsidian version was not recorded, and no debug log was collected. D0, D1 and
+D4 were not reported on.
 
-If D2, D3 and D4 all open on page 1, the link cannot carry a page to these
-viewers, and the experiment setting should be removed rather than left in.
-
-## Reported by the tester, not yet witnessed
+## Reported before the build existed
 
 These were reported by the tester on 2026-11-20, before this build existed,
 on iPadOS 18.7.8, with no log or hash behind them. They are context for the
@@ -63,7 +78,8 @@ path was never going to ship; the check is recorded so nobody has to wonder.
 
 ### The page reader, in Obsidian 1.15.1
 
-The built plugin (0.3.0) ran in desktop Obsidian 1.15.1 on a scratch vault,
+These two checks are of the 0.3.0 build, which still had the reader. The
+built plugin ran in desktop Obsidian 1.15.1 on a scratch vault,
 and "Show detected page" was compared with pdf.js's own current page in 21
 cases. All 21 matched.
 

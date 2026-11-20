@@ -7,6 +7,15 @@ heading at release; the same lines become the GitHub release notes.
 
 ## Unreleased
 
+## 0.3.1 - 2026-11-20
+
+### Removed
+
+- The page forwarding experiment, with its "Page in link" setting and the
+  "Show detected page" command. On iPadOS 18.7.8 the Files viewer opened on
+  page 1 with the page in the link, so the setting had nothing to offer.
+  Etch PDF now behaves exactly like Etch 0.2.0.
+
 ## 0.3.0 - 2026-11-20
 
 First release of the Etch PDF fork. Handoffs are unchanged from Etch 0.2.0

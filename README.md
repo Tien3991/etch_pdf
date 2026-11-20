@@ -3,10 +3,12 @@
 Native Apple Pencil markup for Obsidian PDFs and images.
 
 Etch PDF is a fork of [Etch](https://github.com/nickarrow/etch) by Nick
-Aretakis. It hands off files exactly as Etch 0.2.0 does, and adds one
-experiment: forwarding the page shown in Obsidian to the viewer. The
-experiment is off unless you turn it on, and it is unproven; see
-[Page forwarding](#page-forwarding-experiment). Everything else below is
+Aretakis, made to test one idea: forwarding the page shown in Obsidian to the
+viewer, so that markup opens where you were reading. The test failed, and as
+of 0.3.1 the experiment is removed: this plugin now behaves exactly like Etch
+0.2.0. Unless you are picking that work up again, install the original Etch.
+What was tried and what was learned is in
+[Page forwarding](#page-forwarding-tried-and-closed). Everything else below is
 upstream's description of Etch 0.2.0, unchanged. The plugin has its own id,
 `etch-pdf`, so it installs beside Etch; keep only one of the two enabled, or
 every PDF gets two pencils.
@@ -115,46 +117,36 @@ markup landed.
   and reports whether its content changed. When off, errors go to the
   console only. Verification reads the whole file to hash it, so on a very
   large file it can be unavailable; the handoff still happens, and a notice
-  says the check was skipped. Debug logging also enables the "Show detected
-  page" command and the setting below.
-- Page in link (experiment). Shown only while debug logging is on, and applied
-  only while it is on. "Off (default)" builds the same link Etch always has.
-  "#page=N" and "?page=N" append the page shown in the PDF view to the link.
-  See the next section before using it.
+  says the check was skipped.
 
-## Page forwarding (experiment)
+## Page forwarding: tried and closed
 
-The goal is for the viewer to open on the page you were reading in Obsidian
-instead of on page 1. Whether any viewer can be told a page is the open
-question, so this ships as an experiment and not as a feature.
+The goal was for the viewer to open on the page you were reading in Obsidian
+instead of on page 1. Version 0.3.0 carried it as an experiment; 0.3.1 removed
+it. The record, so nobody has to repeat the work:
 
-What is established:
+- Reading the page works. A reader took it from the PDF view at the moment of
+  the tap: the toolbar's page box, the page label when the PDF has labels
+  such as "iv", and failing both, whichever page fills most of the view. It
+  matched the viewer's own page in every case checked in Obsidian 1.15.1.
+  That code is in the `0.3.0` tag, in `src/page.ts`.
+- Passing the page in the link does not work. With `#page=N` or `?page=N`
+  appended to the handoff link, the Files viewer on iPadOS 18.7.8 still
+  opened on page 1.
+- A start page stored inside the PDF does not work either. macOS 26.5.1
+  PDFKit opened a test document on page 1 with its OpenAction pointing at
+  page 5, in three forms, and Etch does not write to your files in any case.
 
-- Reading the page works. The plugin reads it from the PDF view at the moment
-  of the tap: the toolbar's page box, the page label when the PDF has labels
-  such as "iv", and failing both, whichever page fills most of the view. This
-  was checked in Obsidian 1.15.1 on macOS against plain, labelled, and
-  repeated-label PDFs, zoomed in and out and with one file open in two tabs.
-  The "Show detected page" command reports what it reads.
-- A start page stored inside the PDF does not work with Apple's PDF engine.
-  macOS 26.5.1 PDFKit opened a test document on page 1 with its OpenAction
-  pointing at page 5, in three forms. Etch does not write to your files in any
-  case, so this path is closed twice over.
+So the Files viewer, handed the whole file, could not be told where to open
+it: not by the link on iPadOS 18.7.8, and going by PDFKit on macOS, not by
+the file either. The Preview app that iPadOS 26 adds was not tested.
+`docs/device-tests.md` has the details.
 
-What is not established:
-
-- Whether the Files viewer or Preview honours a page appended to the link.
-  Neither documents one, and no device session has shown it. A link carrying a
-  suffix might open on the page, open on page 1 as before, or fail to open the
-  file; if a handoff stops working, set the experiment back to off.
-
-`docs/device-tests.md` holds the test matrix and the results as they come in.
-Nothing in this section is a promise until a row there says so.
-
-One disclosure: the page is read from the page elements of Obsidian's PDF
-viewer, reached through the view's public container. That is not an internal
-API call, but the shape of those elements is not a documented contract
-either. If it changes, the plugin reads no page and hands off without one.
+Two things would land on the right page, and neither is built here. One is
+handing off only the page being read, as a one-page PDF, and merging the ink
+back afterwards; that makes the plugin rewrite the vault file, which Etch has
+never done. The other is an editor with a go-to-page box, with the page
+number copied for pasting.
 
 ## Data safety
 
@@ -171,7 +163,9 @@ verifiable in the source.
 
 ## Install
 
-Etch PDF is not in the community plugin directory.
+Etch PDF is not in the community plugin directory, and since 0.3.1 it does
+nothing the original Etch does not. To install the original, add
+`nickarrow/etch` in BRAT instead. To install this fork anyway:
 
 - BRAT: install the BRAT community plugin and add `Tien3991/etch_pdf` as a
   beta plugin. BRAT installs the highest version published, release or
