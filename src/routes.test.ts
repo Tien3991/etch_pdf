@@ -11,14 +11,17 @@ vi.mock('obsidian', () => ({
 import {
 	LARGE_FILE_BYTES,
 	LARGE_FILE_NOTICE,
+	PAGE_LINK_LABELS,
 	ROUTE_LABELS,
 	buildHandoffTarget,
 	chooseRoute,
 	encodePathSegments,
+	isPageLinkStyle,
 	isRouteId,
+	pageSuffix,
 } from './routes';
 import { parseResourcePath } from './resolve';
-import { DEFAULT_SETTINGS } from './settings';
+import { DEFAULT_SETTINGS, effectivePageLink } from './settings';
 
 describe('encodePathSegments', () => {
 	it('encodes spaces and keeps separators', () => {
@@ -116,6 +119,129 @@ describe('buildHandoffTarget', () => {
 				'sheet%231%2050%25.pdf',
 			);
 		}
+	});
+});
+
+describe('isPageLinkStyle', () => {
+	it('accepts the three styles', () => {
+		for (const style of ['off', 'fragment', 'query']) {
+			expect(isPageLinkStyle(style)).toBe(true);
+		}
+	});
+
+	it('rejects anything else', () => {
+		for (const value of ['Off', '', 'hash', '#page', true, 0, null, undefined, {}]) {
+			expect(isPageLinkStyle(value)).toBe(false);
+		}
+	});
+});
+
+describe('PAGE_LINK_LABELS', () => {
+	it('labels the three styles with the default first', () => {
+		expect(Object.entries(PAGE_LINK_LABELS)).toEqual([
+			['off', 'Off (default)'],
+			['fragment', '#page=N'],
+			['query', '?page=N'],
+		]);
+	});
+
+	it('names the same style the settings default selects', () => {
+		const [first] = Object.keys(PAGE_LINK_LABELS);
+		expect(first).toBe(DEFAULT_SETTINGS.pageLink);
+		// Off is the only proven value, so it is what a new install gets.
+		expect(DEFAULT_SETTINGS.pageLink).toBe('off');
+	});
+});
+
+describe('pageSuffix', () => {
+	it('builds the fragment and the query form', () => {
+		expect(pageSuffix('fragment', 137)).toBe('#page=137');
+		expect(pageSuffix('query', 137)).toBe('?page=137');
+	});
+
+	it('adds nothing while the experiment is off', () => {
+		expect(pageSuffix('off', 137)).toBe('');
+	});
+
+	it('adds nothing without a page', () => {
+		// An image, a PDF open in no view, or a page that could not be read.
+		for (const style of ['fragment', 'query'] as const) {
+			expect(pageSuffix(style, null)).toBe('');
+		}
+	});
+
+	it('adds nothing for a number that is not a whole page', () => {
+		for (const page of [0, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(pageSuffix('fragment', page)).toBe('');
+			expect(pageSuffix('query', page)).toBe('');
+		}
+	});
+});
+
+describe('buildHandoffTarget with a page suffix', () => {
+	const encoded = '/var/mobile/Documents/v/Kal-Arath%20Sheet.pdf';
+
+	it('builds the same target as before when there is no suffix', () => {
+		for (const route of ['file', 'shareddocuments'] as const) {
+			expect(buildHandoffTarget(route, encoded, '')).toEqual(
+				buildHandoffTarget(route, encoded),
+			);
+			expect(
+				buildHandoffTarget(route, encoded, pageSuffix('off', 5)),
+			).toEqual(buildHandoffTarget(route, encoded));
+		}
+	});
+
+	it('appends the suffix after the encoded path', () => {
+		expect(
+			buildHandoffTarget('shareddocuments', encoded, pageSuffix('fragment', 5)),
+		).toEqual({
+			url: `shareddocuments://${encoded}#page=5`,
+			kind: 'assign',
+			description: `window.location.href = "shareddocuments://${encoded}#page=5"`,
+		});
+		expect(buildHandoffTarget('file', encoded, pageSuffix('query', 5))).toEqual({
+			url: `file://${encoded}?page=5`,
+			kind: 'open',
+			description: `window.open("file://${encoded}?page=5")`,
+		});
+	});
+
+	it('leaves the suffix as the only unescaped # or ? in the URL', () => {
+		// A filename can hold both characters. They are escaped in the path,
+		// so the viewer cannot mistake part of a name for the suffix.
+		const hostile = encodePathSegments('/v/what? sheet#1 #page=9.pdf');
+		for (const route of ['file', 'shareddocuments'] as const) {
+			const fragment = buildHandoffTarget(route, hostile, pageSuffix('fragment', 5));
+			expect(fragment.url.split('#')).toHaveLength(2);
+			expect(fragment.url).not.toContain('?');
+			expect(fragment.url.endsWith('.pdf#page=5')).toBe(true);
+
+			const query = buildHandoffTarget(route, hostile, pageSuffix('query', 5));
+			expect(query.url.split('?')).toHaveLength(2);
+			expect(query.url).not.toContain('#');
+			expect(query.url.endsWith('.pdf?page=5')).toBe(true);
+		}
+	});
+});
+
+describe('effectivePageLink', () => {
+	it('is off whenever debug logging is off', () => {
+		// The control is only shown while debug logging is on, so a value a
+		// test session left behind must not keep changing handoffs.
+		for (const pageLink of ['off', 'fragment', 'query'] as const) {
+			expect(effectivePageLink({ debugLogging: false, pageLink })).toBe('off');
+		}
+	});
+
+	it('is the chosen style while debug logging is on', () => {
+		for (const pageLink of ['off', 'fragment', 'query'] as const) {
+			expect(effectivePageLink({ debugLogging: true, pageLink })).toBe(pageLink);
+		}
+	});
+
+	it('is off for a default install', () => {
+		expect(effectivePageLink(DEFAULT_SETTINGS)).toBe('off');
 	});
 });
 

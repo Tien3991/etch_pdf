@@ -88,11 +88,61 @@ export function isRouteId(value: unknown): value is RouteId {
 	);
 }
 
+/**
+ * How the page shown in Obsidian is added to the handoff URL.
+ *
+ * This is an experiment, and `off` is the only proven value: neither the
+ * Files viewer nor Preview documents a page parameter, and no device session
+ * has shown one honoured. The two candidates are the forms a URL can carry a
+ * page in at all, the PDF open-parameter fragment and a plain query.
+ *
+ * The other way to name a start page is inside the file, as the catalog's
+ * OpenAction. That one is ruled out on evidence as well as on principle:
+ * macOS 26.5.1 PDFKit opened a six-page test document on page 1 with the
+ * OpenAction pointing at page 5, in three forms, and this plugin does not
+ * write to the user's files in any case.
+ */
+export const PAGE_LINK_STYLES = ['off', 'fragment', 'query'] as const;
+
+export type PageLinkStyle = (typeof PAGE_LINK_STYLES)[number];
+
+/** Dropdown labels, in display order with the default first. */
+export const PAGE_LINK_LABELS: Record<PageLinkStyle, string> = {
+	off: 'Off (default)',
+	fragment: '#page=N',
+	query: '?page=N',
+};
+
+/** The same data boundary as the route: data.json is hand-editable. */
+export function isPageLinkStyle(value: unknown): value is PageLinkStyle {
+	return (
+		typeof value === 'string' &&
+		(PAGE_LINK_STYLES as readonly string[]).includes(value)
+	);
+}
+
+/**
+ * What is appended to the URL, or nothing. Only a real page produces a
+ * suffix: an unknown page, an image, or a number that is not a whole page
+ * leaves the URL exactly as it was before this experiment existed.
+ *
+ * The suffix goes after the encoded path, and `encodePathSegments` escapes
+ * every `#` and `?` a filename can contain, so the one appended here is the
+ * only unescaped one in the URL and cannot be confused with the path.
+ */
+export function pageSuffix(style: PageLinkStyle, page: number | null): string {
+	if (style === 'off' || page === null) return '';
+	if (!Number.isSafeInteger(page) || page < 1) return '';
+	return style === 'fragment' ? `#page=${page}` : `?page=${page}`;
+}
+
 export interface HandoffContext {
 	app: App;
 	log: EtchLog;
 	/** What the setting says. The size override can move a handoff off it. */
 	route: RouteId;
+	/** How the page is added to the URL; `off` leaves the URL untouched. */
+	pageLink: PageLinkStyle;
 	/** Persist the armed witness record; resolves once the write completes. */
 	arm: (record: WitnessRecord) => Promise<void>;
 }
@@ -122,16 +172,20 @@ export interface HandoffTarget {
  * The two URLs are the product, so they are built by a pure function the
  * tests can pin. The description strings are the ones the device logs carry;
  * changing them breaks continuity with the archived session logs.
+ *
+ * The suffix is the page experiment's, built by `pageSuffix`. It defaults to
+ * nothing, which is every handoff outside that experiment.
  */
 export function buildHandoffTarget(
 	route: RouteId,
 	encodedPath: string,
+	suffix = '',
 ): HandoffTarget {
 	if (route === 'file') {
-		const url = `file://${encodedPath}`;
+		const url = `file://${encodedPath}${suffix}`;
 		return { url, kind: 'open', description: `window.open("${url}")` };
 	}
-	const url = `shareddocuments://${encodedPath}`;
+	const url = `shareddocuments://${encodedPath}${suffix}`;
 	return {
 		url,
 		kind: 'assign',
@@ -150,12 +204,21 @@ export const LARGE_FILE_NOTICE =
 export async function performHandoff(
 	context: HandoffContext,
 	file: TFile,
+	/** The page shown in Obsidian at tap time, when one could be read. */
+	page: number | null = null,
 ): Promise<void> {
 	const { app, log } = context;
 
 	const decision = chooseRoute(context.route, file.stat.size);
-	const plan = await buildPlan(context, file, decision.route);
+	const suffix = pageSuffix(context.pageLink, page);
+	const plan = await buildPlan(context, file, decision.route, suffix);
 	if (!plan) return;
+
+	if (context.pageLink !== 'off') {
+		await log.line(
+			`page link ${context.pageLink}: page ${page ?? 'unknown'}, suffix "${suffix}"`,
+		);
+	}
 
 	if (decision.overridden) {
 		new Notice(LARGE_FILE_NOTICE, 15000);
@@ -189,9 +252,10 @@ export async function performHandoff(
  * only route in scope here is the effective one.
  */
 async function buildPlan(
-	context: Omit<HandoffContext, 'route'>,
+	context: Omit<HandoffContext, 'route' | 'pageLink'>,
 	file: TFile,
 	route: RouteId,
+	suffix: string,
 ): Promise<HandoffPlan | null> {
 	const { app, log } = context;
 
@@ -205,7 +269,11 @@ async function buildPlan(
 	}
 	await log.line(`resolved ${file.path} -> ${resolved.absolutePath}`);
 
-	const target = buildHandoffTarget(route, encodePathSegments(resolved.absolutePath));
+	const target = buildHandoffTarget(
+		route,
+		encodePathSegments(resolved.absolutePath),
+		suffix,
+	);
 	return {
 		description: target.description,
 		navigate: () => {
