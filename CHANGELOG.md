@@ -7,6 +7,14 @@ heading at release; the same lines become the GitHub release notes.
 
 ## Unreleased
 
+## 0.4.1 - 2026-11-20
+
+### Changed
+
+- The steps for making a shortcut, in the app editor and the README, now say
+  exactly how each action has to read, that the shortcut has to be started
+  from Etch, and what each failure message from Shortcuts means.
+
 ## 0.4.0 - 2026-11-20
 
 ### Added

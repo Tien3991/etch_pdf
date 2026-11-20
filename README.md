@@ -164,15 +164,33 @@ Once per app, in the Shortcuts app on the iPad:
 
 1. Create a shortcut. Its name is what you enter as the shortcut name in
    Etch, for example "Open in Xodo"; the two have to match exactly.
-2. Add the action "Get File from Folder". Set its folder to the vault (On My
-   iPad, Obsidian, then the vault), and its file path to Shortcut Input.
-3. Add the action "Open File", and set its app to the editor.
+2. Add the action "Get File from Folder".
+   - Tap the folder and choose the vault: On My iPad, Obsidian, then the
+     vault's own folder.
+   - Tap the path and pick **Shortcut Input** from the bar above the
+     keyboard. It has to be picked, so that it shows as a variable; typing
+     the words does not work.
+   - The action then reads: *Get file from (vault) at path Shortcut Input*.
+     Leave "Error If Not Found" on.
+3. Add the action "Open File" right below it, and set its app to the editor.
+   It then reads: *Open File in (editor)*, where File is the result of step 2.
+
+Start the shortcut from Etch, not with the play button in Shortcuts. Only
+Etch tells it which file to open; started on its own it has no file name.
 
 Etch runs the shortcut by the documented `shortcuts://run-shortcut` link and
 passes it the file's path inside the vault. The Shortcuts app comes to the
-front for a moment on the way. The action names above are the English ones
-as best known; they have not been confirmed in a device session with this
-build, so the labels on your iPad may differ slightly.
+front for a moment on the way. The action and field names above are the ones
+Shortcuts ships with; how the action behaves on an iPad is what the device
+matrix is for.
+
+If it fails, the message says where:
+
+| Message from Shortcuts | What it means |
+| --- | --- |
+| "(Editor) is not installed or could not open the file (your vault's name)" | The shortcut handed the editor the vault folder, because the path in step 2 was empty. Either Shortcut Input is not picked as the path, or the shortcut was started from inside Shortcuts. |
+| "No item was found at path: …" | The path arrived but nothing is there: the folder in step 2 is not the vault's own folder. |
+| "(Editor) is not installed or could not open the file (the PDF's name)" | The right file arrived and the editor did not take it. Use "Other app (share sheet)" for that editor. |
 
 ### What to check with an editor
 

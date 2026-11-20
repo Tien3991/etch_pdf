@@ -22,7 +22,7 @@ logging in the plugin's settings. Use a PDF you can afford to lose.
 | A3 | Tap the left half with the default set to Files viewer. | The Files viewer opens as it did before (regression check). | not run |
 | A4 | Chevron, Other app (share sheet), then Xodo. Write something, return to Obsidian, run "Verify last handoff". | Is the entry "Open in" or "Copy to"? Is the ink in Obsidian? Does verify say "content changed"? | not run |
 | A5 | The same as A4 with PDF Viewer. | The same three answers. | not run |
-| A6 | Make the shortcut "Open in Xodo" (README, Making a shortcut). In settings, Add app, Xodo. Chevron, Xodo. | Does Shortcuts run and Xodo open the file? Write, return, verify: was the vault file written? | not run |
+| A6 | Make the shortcut "Open in Xodo" (README, Making a shortcut). In settings, Add app, Xodo. Chevron, Xodo. | Does Shortcuts run and Xodo open the file? Write, return, verify: was the vault file written? | first attempt failed, see below |
 | A7 | Set Default app to Xodo. Tap the left half. | One tap from Obsidian to Xodo. | not run |
 | A8 | Open the same PDF in Xodo a second time, through Etch. | Does Xodo open near where it was left? That only holds if Xodo sees the same file both times. | not run |
 | A9 | In settings: add an app, edit it, remove it. | The list, the default-app choices and the button's label follow each change. | not run |
@@ -30,6 +30,19 @@ logging in the plugin's settings. Use a PDF you can afford to lose.
 A4, A5 and A6 are the ones that matter for data safety: an editor that
 imports a copy leaves the vault file untouched, and nothing in Etch can
 change that.
+
+A6, first attempt, 2026-11-20, iPadOS 18.7.8, build 0.4.0. The tester
+reported the message "Xodo is not installed or could not open the file idk",
+where idk is the vault's folder. That is the Open File action's own error
+(`%1$@ is not installed or could not open the file %2$@.`), with the vault
+folder in the place of the file: the shortcut ran, and its Get File from
+Folder step produced the folder, which is what an empty path gives. What is
+established: Etch's link reached Shortcuts and started the right shortcut.
+What is not: why the path was empty. The two candidates are a path field
+that does not hold the Shortcut Input variable, and a run started from inside
+Shortcuts, where there is no input. The steps in the README and the app
+editor were rewritten in 0.4.1 to rule both out; the row stays open until a
+second attempt.
 
 ### Desk checks (macOS, 2026-11-20)
 

@@ -65,6 +65,10 @@ export class AppEditor extends Modal {
 					}),
 			);
 
+		// The action and field names are Shortcuts' own, checked against the
+		// strings that app ships with. The closing lines exist because the
+		// first device attempt failed in exactly this way: the path was empty,
+		// so the shortcut handed the editor the vault folder.
 		const steps = contentEl.createDiv({ cls: 'etch-app-steps' });
 		steps.createDiv({
 			text: 'Make the shortcut once, in the Shortcuts app on this iPad:',
@@ -74,13 +78,16 @@ export class AppEditor extends Modal {
 			text: 'Create a shortcut and give it the name entered above.',
 		});
 		list.createEl('li', {
-			text: 'Add the action "Get File from Folder". Set its folder to this vault (On My iPad, Obsidian, then the vault) and its file path to Shortcut Input.',
+			text: 'Add the action "Get File from Folder". Tap the folder and choose this vault (On My iPad, Obsidian, then the vault). Tap the path and pick Shortcut Input from the bar above the keyboard; picking it matters, typing the words does not work. The action then reads: Get file from (vault) at path Shortcut Input.',
 		});
 		list.createEl('li', {
-			text: 'Add the action "Open File" and set its app to the editor.',
+			text: 'Add the action "Open File" right below it, and set its app to the editor. It then reads: Open File in (editor), where File is the result of the step above.',
 		});
 		steps.createDiv({
-			text: 'Etch runs the shortcut and passes it the path of the file inside the vault.',
+			text: 'Start it from Etch, not with the play button in Shortcuts: only Etch tells the shortcut which file to open.',
+		});
+		steps.createDiv({
+			text: 'If an error names your vault instead of a file, the path in step 2 is empty.',
 		});
 
 		new Setting(contentEl)
