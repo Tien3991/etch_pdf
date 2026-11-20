@@ -34,12 +34,7 @@ export class ViewActions {
 		private readonly app: App,
 		private readonly icon: string,
 		private readonly title: string,
-		/**
-		 * The view comes along with the file so the caller can read the page
-		 * that view is showing: the same file can be open in two tabs on two
-		 * different pages, and the pencil that was tapped names which one.
-		 */
-		private readonly onTrigger: (file: TFile, view: FileView) => void,
+		private readonly onTrigger: (file: TFile) => void,
 	) {}
 
 	/**
@@ -85,7 +80,7 @@ export class ViewActions {
 	private install(view: FileView): HTMLElement {
 		const el = view.addAction(this.icon, this.title, () => {
 			const file = view.file;
-			if (file && isMarkupFile(file)) this.onTrigger(file, view);
+			if (file && isMarkupFile(file)) this.onTrigger(file);
 		});
 		el.addClass(VIEW_ACTION_CLASS);
 		// Obsidian labels its own header actions; setting it here makes the

@@ -2,15 +2,9 @@ import { Notice, Platform, Plugin, TFile, normalizePath } from 'obsidian';
 import { ViewActions } from './actions';
 import { isMarkupFile } from './formats';
 import { EtchLog, describeError } from './log';
-import { PageHint, describeReading, readPageFor } from './page';
 import { ImageRefresh } from './refresh';
-import { isPageLinkStyle, isRouteId, performHandoff } from './routes';
-import {
-	DEFAULT_SETTINGS,
-	EtchSettings,
-	EtchSettingTab,
-	effectivePageLink,
-} from './settings';
+import { isRouteId, performHandoff } from './routes';
+import { DEFAULT_SETTINGS, EtchSettings, EtchSettingTab } from './settings';
 import {
 	WitnessRecord,
 	WitnessReport,
@@ -88,23 +82,8 @@ export default class EtchPlugin extends Plugin {
 			},
 		});
 
-		// A debug aid for the page experiment, and the one command that is
-		// not gated on the iPad: the PDF view is the same code on desktop, so
-		// the page reader can be checked there before a device session.
-		this.addCommand({
-			id: 'show-detected-page',
-			name: 'Show detected page',
-			checkCallback: (checking) => {
-				if (!this.settings.debugLogging) return false;
-				const file = this.app.workspace.getActiveFile();
-				if (!file || file.extension.toLowerCase() !== 'pdf') return false;
-				if (!checking) this.showDetectedPage(file);
-				return true;
-			},
-		});
-
 		this.registerEvent(
-			this.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
+			this.app.workspace.on('file-menu', (menu, file) => {
 				if (!isIpad() || !(file instanceof TFile) || !isMarkupFile(file)) {
 					return;
 				}
@@ -114,9 +93,7 @@ export default class EtchPlugin extends Plugin {
 						.setIcon(MARK_UP_ICON)
 						.setSection('open')
 						.onClick(() => {
-							// The leaf is the tab the menu was opened on, when it
-							// was opened on one; it names which view's page to read.
-							void this.markUp(file, { leaf });
+							void this.markUp(file);
 						}),
 				);
 			}),
@@ -126,8 +103,8 @@ export default class EtchPlugin extends Plugin {
 			this.app,
 			MARK_UP_ICON,
 			MARK_UP_NAME,
-			(file, view) => {
-				void this.markUp(file, { view });
+			(file) => {
+				void this.markUp(file);
 			},
 		);
 		this.register(() => {
@@ -228,50 +205,28 @@ export default class EtchPlugin extends Plugin {
 	 * arriving here would otherwise be an unhandled rejection with nothing on
 	 * screen and nothing in the log.
 	 */
-	private async markUp(file: TFile, hint: PageHint = {}): Promise<void> {
+	private async markUp(file: TFile): Promise<void> {
 		if (!isMarkupFile(file)) {
 			await this.log.error(`${file.path} is not a format Etch hands off`);
 			return;
 		}
-		// Read before the first await, so the page is the one on screen at
-		// the tap. With the experiment off nothing is read at all, and the
-		// handoff is the one it has always been.
-		const pageLink = effectivePageLink(this.settings);
-		const reading =
-			pageLink === 'off' ? null : readPageFor(this.app, file, hint);
 		try {
-			if (reading) {
-				await this.log.line(`displayed ${describeReading(reading)}`);
-			}
 			await performHandoff(
 				{
 					app: this.app,
 					log: this.log,
 					route: this.settings.route,
-					pageLink,
 					arm: async (record) => {
 						this.witnessRecord = record;
 						await this.savePluginData();
 					},
 				},
 				file,
-				reading?.page ?? null,
 			);
 		} catch (error) {
 			new Notice('Etch could not complete the handoff.');
 			await this.log.error(`handoff failed for ${file.path}`, error);
 		}
-	}
-
-	/**
-	 * Reports what the page reader sees for the active PDF, with each
-	 * source's own answer, so a disagreement between them is visible in one
-	 * notice instead of being inferred from where a viewer opened.
-	 */
-	private showDetectedPage(file: TFile): void {
-		const summary = describeReading(readPageFor(this.app, file));
-		new Notice(`Detected ${summary}.`, 10000);
-		void this.log.line(`show detected page, ${file.path}: ${summary}`);
 	}
 
 	/**
@@ -407,15 +362,9 @@ export default class EtchPlugin extends Plugin {
 		if (storedRoute !== undefined && !knownRoute) {
 			this.rejectedRoute = describeError(storedRoute);
 		}
-		// An unknown page-link value reads as off, which is the proven
-		// behavior; nothing needs reporting, since off changes nothing.
-		const storedPageLink = storedSettings.pageLink;
 		this.settings = {
 			route: knownRoute ? storedRoute : DEFAULT_SETTINGS.route,
 			debugLogging: storedSettings.debugLogging === true,
-			pageLink: isPageLinkStyle(storedPageLink)
-				? storedPageLink
-				: DEFAULT_SETTINGS.pageLink,
 		};
 
 		this.witnessRecord = isWitnessRecord(raw?.witness) ? raw.witness : null;
