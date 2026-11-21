@@ -1,7 +1,7 @@
 {
-	"name": "etch",
-	"version": "0.2.0",
-	"description": "Native Apple Pencil markup for vault PDFs. One tap opens the file for markup, and the ink saves into the same vault file.",
+	"name": "etch-pdf",
+	"version": "0.5.0",
+	"description": "Native Apple Pencil markup for vault PDFs. One tap opens the file for markup, and the ink saves into the same vault file. Fork of Etch that always uses the handoff route you chose.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
