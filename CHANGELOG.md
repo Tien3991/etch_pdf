@@ -7,6 +7,27 @@ heading at release; the same lines become the GitHub release notes.
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-21
+
+Etch PDF is a fork of Etch, and this release is Etch 0.2.0 with one change.
+Versions 0.3.0 to 0.4.1 of the fork were experiments kept on other branches;
+nothing from them is in this release.
+
+### Changed
+
+- The handoff route is always the one chosen in settings. A file of 4 MB or
+  more is no longer moved from Preview to the Files viewer, and the notice
+  that explained the move is gone. Preview can lose markup on long PDFs, so
+  check that your ink was saved.
+- The plugin id is `etch-pdf` and its name Etch PDF, so it installs beside
+  the original Etch.
+
+### Removed
+
+- For anyone updating from 0.4.1: the split button, the list of apps, apps
+  opened by a shortcut, and the share sheet entry. They remain on the
+  `app-targets` branch.
+
 ## 0.2.0 - 2026-08-11
 
 ### Added

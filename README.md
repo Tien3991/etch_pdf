@@ -1,6 +1,16 @@
-# Etch
+# Etch PDF
 
 Native Apple Pencil markup for Obsidian PDFs and images.
+
+Etch PDF is a fork of [Etch](https://github.com/nickarrow/etch) by Nick
+Aretakis with one difference: the handoff route you choose is the one that
+is used, for a file of any size. The original sends any file of 4 MB or more
+to the Files viewer even when Preview is chosen, because Preview has lost
+markup on long PDFs. This fork does not look at the file's size, which
+leaves that risk with you; see Limitations. Everything else below is
+upstream's description of Etch 0.2.0. The plugin has its own id, `etch-pdf`,
+so it installs beside Etch; keep only one of the two enabled, or every PDF
+gets two pencils.
 
 One tap opens a vault PDF or image for Apple Pencil markup. Draw with the
 Pencil, tap the check mark, and the ink is in the same vault file: visible
@@ -16,15 +26,16 @@ moves.
   new iPadOS major is unverified until it has been re-checked.
 - Local vaults only ("On My iPad"). Files anywhere else, including iCloud
   Drive vaults, are declined with a notice.
-- Apple's Preview app loses Pencil markup on long PDFs, so Etch keeps large
-  files away from it. On an iPad Pro running iPadOS 26.5.2, an 18 MB and a
-  243 MB document, both several hundred pages, kept their markup through the
-  Files viewer every time and lost it through Preview every time. Etch defaults
-  to the Files viewer, and sends any file of 4 MB or more there even when
-  Preview is the chosen route. File size is a rough stand-in for page count,
-  which is what Preview actually struggles with, so a small file with many
-  pages stays on Preview and is the gap in that rule. Use the Files viewer
-  route if you work in one.
+- Apple's Preview app can lose Pencil markup on long PDFs, and this fork does
+  not keep large files away from it. On an iPad Pro running iPadOS 26.5.2,
+  upstream saw an 18 MB and a 243 MB document, both several hundred pages,
+  keep their markup through the Files viewer every time and lose it through
+  Preview every time. The original Etch therefore sends any file of 4 MB or
+  more to the Files viewer even when Preview is the chosen route. Etch PDF
+  has no such rule: with Preview as the route, every file goes to Preview,
+  whatever its size. When you mark up a long PDF through Preview, check that
+  the ink is there when you return, and use the Files viewer route for the
+  documents where it is not. The Files viewer is still the default route.
 - Apple Preview must be installed for the Preview route; iPadOS allows
   deleting it, per Apple's documentation. What happens if Preview is absent is
   unverified.
@@ -81,8 +92,8 @@ for the reason in Limitations.
 
 On the Preview route instead, draw with the Pencil and switch back to
 Obsidian; there is nothing to tap, and Preview writes the file about half a
-second after you leave it (observed on iPadOS 26.5.2). Large PDFs still open in
-the Files viewer, with a notice saying why.
+second after you leave it (observed on iPadOS 26.5.2). That is the route for a
+file of any size: this fork does not move large PDFs to the Files viewer.
 
 After a markup, the PDF view and any
 embeds of it refresh on their own (observed on iPadOS 26.5.2 with Obsidian
@@ -98,9 +109,9 @@ markup landed.
 
 - Handoff route. "Files viewer (default)" opens the file in the Files viewer,
   where Markup is one tap and the check mark saves. "Preview" opens it
-  directly in Preview, which is smoother on small files since it saves without
-  a tap, and any file of 4 MB or more still goes to the Files viewer. If one
-  route ever stops working after an OS update, the other is the fallback.
+  directly in Preview, which saves without a tap, and does so for a file of
+  any size; Limitations has what Preview can do to long PDFs. If one route
+  ever stops working after an OS update, the other is the fallback.
 - Debug logging. Writes a verbose log to the plugin folder and enables the
   "Verify last handoff" command, which re-hashes the last handed-off file
   and reports whether its content changed. When off, errors go to the
@@ -123,14 +134,16 @@ verifiable in the source.
 
 ## Install
 
-Etch is not yet in the community plugin directory. Until it is listed:
+Etch PDF is not in the community plugin directory.
 
-- BRAT: install the BRAT community plugin and add `nickarrow/etch` as a
+- BRAT: install the BRAT community plugin and add `Tien3991/etch_pdf` as a
   beta plugin. BRAT installs the highest version published, release or
   pre-release.
 - Manual: copy `main.js`, `manifest.json`, and `styles.css` from a release
-  into `<vault>/.obsidian/plugins/etch/`, then enable Etch under community
-  plugins.
+  into `<vault>/.obsidian/plugins/etch-pdf/`, then enable Etch PDF under
+  community plugins.
+
+If the original Etch is installed, disable it while Etch PDF is enabled.
 
 ## License
 
