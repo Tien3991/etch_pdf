@@ -45,7 +45,7 @@ export class EtchSettingTab extends PluginSettingTab {
 						text: 'Files viewer (default): opens the file in the Files viewer. Tap Markup, then the check mark to save before returning.',
 					});
 					fragment.createDiv({
-						text: 'Preview: opens the file directly in Preview, which is smoother on small files. Large PDFs still open in the Files viewer, because Preview can lose markup on them.',
+						text: 'Preview: opens the file directly in Preview, whatever its size. Preview can lose markup on long PDFs, so check that your ink was saved, or use the Files viewer for those.',
 					});
 				}),
 				control: {

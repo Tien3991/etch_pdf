@@ -357,7 +357,11 @@ export default class EtchPlugin extends Plugin {
 		const stored: unknown = raw?.settings;
 		const storedSettings = (stored ?? {}) as Record<string, unknown>;
 
-		const storedRoute = storedSettings.route;
+		// The 0.4 builds of this fork kept the choice under `target`. It is
+		// read when `route` is absent, so a choice of Preview made there
+		// survives the update; a value that named an app or the share sheet
+		// is not a route and falls back like any other unknown value.
+		const storedRoute = storedSettings.route ?? storedSettings.target;
 		const knownRoute = isRouteId(storedRoute);
 		if (storedRoute !== undefined && !knownRoute) {
 			this.rejectedRoute = describeError(storedRoute);

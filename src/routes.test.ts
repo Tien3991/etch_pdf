@@ -1,21 +1,28 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The obsidian package ships type definitions only. routes.ts imports Notice
 // as a runtime value, and settings.ts, pulled in here to pin the default route
 // against the dropdown order, extends PluginSettingTab at module scope.
+// Notices are recorded, since "no notice" is part of what a handoff that
+// follows the setting has to show.
+const { notices } = vi.hoisted(() => ({ notices: [] as string[] }));
 vi.mock('obsidian', () => ({
-	Notice: class {},
+	Notice: class {
+		constructor(message: string) {
+			notices.push(message);
+		}
+	},
 	PluginSettingTab: class {},
 }));
 
 import {
-	LARGE_FILE_BYTES,
-	LARGE_FILE_NOTICE,
+	HandoffContext,
 	ROUTE_LABELS,
+	RouteId,
 	buildHandoffTarget,
-	chooseRoute,
 	encodePathSegments,
 	isRouteId,
+	performHandoff,
 } from './routes';
 import { parseResourcePath } from './resolve';
 import { DEFAULT_SETTINGS } from './settings';
@@ -134,75 +141,139 @@ describe('ROUTE_LABELS', () => {
 	});
 });
 
-describe('chooseRoute', () => {
-	// Preview wrote nothing on two several-hundred-page PDFs across nine
-	// handoffs in the wave 3 session; the Files viewer wrote both every time.
-	it('sends a large file to the Files viewer even when Preview is chosen', () => {
-		expect(chooseRoute('file', LARGE_FILE_BYTES)).toEqual({
-			route: 'shareddocuments',
-			overridden: true,
+/**
+ * The setting is the whole decision. Upstream moved a file of 4 MiB or more
+ * from Preview to the Files viewer; this fork does not look at the size, and
+ * these tests are what keeps it from looking again.
+ */
+describe('performHandoff', () => {
+	const CONTAINER = '/var/mobile/Containers/Data/Application/AAAA/Documents/vault';
+	// The sizes upstream's rule turned on: under the old threshold, on it,
+	// the two documents that failed on device, and what an unreadable stat
+	// looks like.
+	const SIZES = [0, 1016315, 4194304, 18335754, 254739264, Number.NaN, -1];
+
+	let opened: string[];
+	let assigned: string[];
+
+	beforeEach(() => {
+		notices.length = 0;
+		opened = [];
+		assigned = [];
+		vi.stubGlobal('window', {
+			open: (url: string) => {
+				opened.push(url);
+				return null;
+			},
+			location: {
+				set href(url: string) {
+					assigned.push(url);
+				},
+			},
 		});
-		expect(chooseRoute('file', 254739264)).toEqual({
-			route: 'shareddocuments',
-			overridden: true,
-		});
 	});
 
-	it('leaves a small file on Preview', () => {
-		// The 1 MB PDF and the images that round-tripped through Preview in
-		// the same session.
-		for (const size of [0, 1016315, LARGE_FILE_BYTES - 1]) {
-			expect(chooseRoute('file', size)).toEqual({
-				route: 'file',
-				overridden: false,
-			});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	function stubContext(route: RouteId): { context: HandoffContext; log: string[] } {
+		const log: string[] = [];
+		const context = {
+			app: {
+				vault: {
+					getResourcePath: (file: { path: string }) =>
+						`capacitor://localhost/_capacitor_file_${CONTAINER}/${encodePathSegments(file.path)}`,
+					adapter: {
+						stat: () => Promise.resolve({ size: 3, mtime: 1 }),
+						readBinary: () => Promise.resolve(new Uint8Array([1, 2, 3]).buffer),
+					},
+				},
+			},
+			log: {
+				line: (message: string) => {
+					log.push(message);
+					return Promise.resolve();
+				},
+				error: (message: string) => {
+					log.push(`ERROR ${message}`);
+					return Promise.resolve();
+				},
+			},
+			route,
+			arm: () => Promise.resolve(),
+		} as unknown as HandoffContext;
+		return { context, log };
+	}
+
+	type FileArg = Parameters<typeof performHandoff>[1];
+	function stubFile(size: number, path = 'Books/Real Analysis.pdf'): FileArg {
+		return { path, name: path.split('/').pop() ?? path, stat: { size } } as FileArg;
+	}
+
+	it('opens Preview when Preview is chosen, at every size', async () => {
+		for (const size of SIZES) {
+			opened.length = 0;
+			assigned.length = 0;
+			const { context } = stubContext('file');
+			await performHandoff(context, stubFile(size));
+			expect(opened).toEqual([`file://${CONTAINER}/Books/Real%20Analysis.pdf`]);
+			expect(assigned).toEqual([]);
 		}
 	});
 
-	it('never overrides the Files viewer, at any size', () => {
-		for (const size of [0, LARGE_FILE_BYTES, 254739264]) {
-			expect(chooseRoute('shareddocuments', size)).toEqual({
-				route: 'shareddocuments',
-				overridden: false,
-			});
+	it('opens the Files viewer when the Files viewer is chosen, at every size', async () => {
+		for (const size of SIZES) {
+			opened.length = 0;
+			assigned.length = 0;
+			const { context } = stubContext('shareddocuments');
+			await performHandoff(context, stubFile(size));
+			expect(assigned).toEqual([
+				`shareddocuments://${CONTAINER}/Books/Real%20Analysis.pdf`,
+			]);
+			expect(opened).toEqual([]);
 		}
 	});
 
-	it('treats the threshold as inclusive', () => {
-		expect(chooseRoute('file', LARGE_FILE_BYTES - 1).overridden).toBe(false);
-		expect(chooseRoute('file', LARGE_FILE_BYTES).overridden).toBe(true);
-	});
-
-	it('sits well under the smallest size known to fail', () => {
-		// 18 MB failed on device. A threshold above that would ship the
-		// failure; this test is what keeps a later tweak honest.
-		expect(LARGE_FILE_BYTES).toBeLessThan(18335754);
-	});
-
-	it('is the size the docs and the copy describe', () => {
-		// ETCH.md says 4 MiB and the user-facing copy rounds it to 4 MB.
-		expect(LARGE_FILE_BYTES).toBe(4194304);
-	});
-
-	it('treats a size it cannot trust as large', () => {
-		// The size is Obsidian's cached stat, so it can be absent or stale.
-		// Only a size known to be small keeps Preview: guessing wrong toward
-		// the Files viewer costs two taps, the other way costs the markup.
-		for (const size of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
-			expect(chooseRoute('file', size)).toEqual({
-				route: 'shareddocuments',
-				overridden: true,
-			});
-		}
-	});
-});
-
-describe('LARGE_FILE_NOTICE', () => {
-	it('matches the settings copy', () => {
-		// Verbatim in ETCH.md's settings copy, like the dropdown labels: it
-		// explains a viewer the user did not choose and how to save there.
-		expect(LARGE_FILE_NOTICE).toBe(
-			'Etch used the Files viewer for this large file, because Preview can lose markup on large PDFs. Tap Markup, then the check mark to save.',
+	it('says nothing about size, on screen or in the log', async () => {
+		// Upstream's rule announced itself with a notice and a log line.
+		const { context, log } = stubContext('file');
+		await performHandoff(context, stubFile(254739264));
+		expect(notices).toEqual([]);
+		expect(log.some((line) => /size override/.test(line))).toBe(false);
+		expect(log).toContain(
+			`route file: window.open("file://${CONTAINER}/Books/Real%20Analysis.pdf")`,
 		);
+	});
+
+	it('never reads the file stat', async () => {
+		// The strongest form of "ignores file size": a stat that cannot be
+		// read at all changes nothing.
+		const file = { path: 'Big.pdf', name: 'Big.pdf' } as FileArg;
+		Object.defineProperty(file, 'stat', {
+			get() {
+				throw new Error('the file stat was read');
+			},
+		});
+		const { context } = stubContext('file');
+		await performHandoff(context, file);
+		expect(opened).toEqual([`file://${CONTAINER}/Big.pdf`]);
+	});
+
+	it('navigates exactly once', async () => {
+		const { context } = stubContext('file');
+		await performHandoff(context, stubFile(254739264));
+		expect(opened.length + assigned.length).toBe(1);
+	});
+
+	it('still declines a file it cannot place, without navigating', async () => {
+		// Removing the size rule must not loosen the path check.
+		const { context } = stubContext('file');
+		(context.app.vault as unknown as { getResourcePath: () => string }).getResourcePath =
+			() => 'app://something-else/Big.pdf';
+		await performHandoff(context, stubFile(254739264, 'Big.pdf'));
+		expect(opened).toEqual([]);
+		expect(assigned).toEqual([]);
+		expect(notices).toHaveLength(1);
 	});
 });
